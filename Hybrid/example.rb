@@ -50,9 +50,6 @@ def run_example
       base_url: 'https://management.local.azurestack.external' # Azure Resource Manager Url
   }
 
-  #client = Azure::Resources::Profiles::V2017_03_09::Mgmt::Client.new(options)
-
-  
   resource_client = Azure::Resources::Profiles::V2017_03_09::Mgmt::Client.new(options)
   network_client = Azure::Network::Profiles::V2017_03_09::Mgmt::Client.new(options)
   storage_client = Azure::Storage::Profiles::V2017_03_09::Mgmt::Client.new(options)
@@ -71,7 +68,7 @@ def run_example
 
   postfix = rand(1000)
   storage_account_name = "rubystor#{postfix}"
-  puts "Creating a standard storage account with encryption off named #{storage_account_name} in resource group #{GROUP_NAME}"
+  puts "Creating a standard storage account named #{storage_account_name} in resource group #{GROUP_NAME}"
   storage_create_params = StorageModels::StorageAccountCreateParameters.new.tap do |account|
     account.location = LOCAL
     account.sku = StorageModels::Sku.new.tap do |sku|

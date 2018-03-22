@@ -38,11 +38,7 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
     bundle install
     ```
     
-5. Create an Azure service principal either through
-
-    [Azure CLI](https://azure.microsoft.com/documentation/articles/resource-group-authenticate-service-principal-cli/),
-    [PowerShell](https://azure.microsoft.com/documentation/articles/resource-group-authenticate-service-principal/)
-    or [the portal](https://azure.microsoft.com/documentation/articles/resource-group-create-service-principal-portal/).
+5. Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
 
 6. Set the following environment variables using the information from the service principle that you created.
 
@@ -67,20 +63,29 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
 This sample starts by setting up ResourceManagementClient, the resource provider clients, a resource group, and a storage account using your subscription and credentials.
 
 ```ruby
-subscription_id = ENV['AZURE_SUBSCRIPTION_ID'] || '11111111-1111-1111-1111-111111111111' # your Azure Subscription Id
-provider = MsRestAzure::ApplicationTokenProvider.new(
-    ENV['AZURE_TENANT_ID'],
-    ENV['AZURE_CLIENT_ID'],
-    ENV['AZURE_CLIENT_SECRET'])
-credentials = MsRest::TokenCredentials.new(provider)
-resource_client = Azure::ARM::Resources::ResourceManagementClient.new(credentials)
-resource_client.subscription_id = subscription_id
-network_client = Azure::ARM::Network::NetworkManagementClient.new(credentials)
-network_client.subscription_id = subscription_id
-storage_client = Azure::ARM::Storage::StorageManagementClient.new(credentials)
-storage_client.subscription_id = subscription_id
-compute_client = Azure::ARM::Compute::ComputeManagementClient.new(credentials)
-compute_client.subscription_id = subscription_id
+  subscription_id = ENV['AZURE_SUBSCRIPTION_ID'] || '11111111-1111-1111-1111-111111111111' # your Azure Subscription Id
+  active_directory_settings = get_active_directory_settings()
+
+
+  provider = MsRestAzure::ApplicationTokenProvider.new(
+      ENV['AZURE_TENANT_ID'],
+      ENV['AZURE_CLIENT_ID'],
+      ENV['AZURE_CLIENT_SECRET'],
+      active_directory_settings
+      )
+  credentials = MsRest::TokenCredentials.new(provider)
+
+  options = {
+      credentials: credentials,
+      subscription_id: subscription_id,
+      active_directory_settings: active_directory_settings,
+      base_url: 'https://management.local.azurestack.external' # Azure Resource Manager Url
+  }
+
+  resource_client = Azure::Resources::Profiles::V2017_03_09::Mgmt::Client.new(options)
+  network_client = Azure::Network::Profiles::V2017_03_09::Mgmt::Client.new(options)
+  storage_client = Azure::Storage::Profiles::V2017_03_09::Mgmt::Client.new(options)
+  compute_client = Azure::Compute::Profiles::V2017_03_09::Mgmt::Client.new(options)
 
 resource_group_params = Azure::ARM::Resources::Models::ResourceGroup.new.tap do |rg|
     rg.location = REGION
@@ -89,21 +94,14 @@ end
 resource_group = resource_client.resource_groups.create_or_update(RESOURCE_GROUP_NAME, resource_group_params)
 postfix = rand(1000)
 storage_account_name = "rubystor#{postfix}"
-puts "Creating a premium storage account with encryption off named #{storage_account_name} in resource group #{GROUP_NAME}"
+puts "Creating a standard storage account named #{storage_account_name} in resource group #{GROUP_NAME}"
 storage_create_params = StorageModels::StorageAccountCreateParameters.new.tap do |account|
     account.location = REGION
     account.sku = StorageModels::Sku.new.tap do |sku|
-        sku.name = StorageModels::SkuName::PremiumLRS
-        sku.tier = StorageModels::SkuTier::Premium
+        sku.name = StorageModels::SkuName::StandardLRS
+        sku.tier = StorageModels::SkuTier::Standard
     end
     account.kind = StorageModels::Kind::Storage  
-    account.encryption = StorageModels::Encryption.new.tap do |encrypt|
-        encrypt.services = StorageModels::EncryptionServices.new.tap do |services|
-            services.blob = StorageModels::EncryptionService.new.tap do |service|
-                service.enabled = false
-            end
-        end
-    end
 end
 print_item storage_account = storage_client.storage_accounts.create(GROUP_NAME, storage_account_name, storage_create_params)
 ```
@@ -140,7 +138,7 @@ public_ip_params = NetworkModels::PublicIPAddress.new.tap do |ip|
     ip.location = REGION
     ip.public_ipallocation_method = NetworkModels::IPAllocationMethod::Dynamic
     ip.dns_settings = NetworkModels::PublicIPAddressDnsSettings.new.tap do |dns|
-        dns.domain_name_label = 'sample-ruby-domain-name-label'
+        dns.domain_name_label = "stack-sample-dns#{postfix}"
     end
 end
 print_item public_ip = network_client.public_ipaddresses.create_or_update(GROUP_NAME, 'sample-ruby-pubip', public_ip_params)
@@ -185,7 +183,7 @@ vm_create_params = ComputeModels::VirtualMachine.new.tap do |vm|
             os_disk.caching = ComputeModels::CachingTypes::None
             os_disk.create_option = ComputeModels::DiskCreateOptionTypes::FromImage
             os_disk.vhd = ComputeModels::VirtualHardDisk.new.tap do |vhd|
-                vhd.uri = "https://#{storage_acct.name}.blob.core.windows.net/rubycontainer/#{vm_name}.vhd"
+                vhd.uri = "https://#{storage_acct.name}.blob.#{public_ip.dns_settings.fqdn}/rubycontainer/#{vm_name}.vhd"
             end
         end
     end
