@@ -40,7 +40,27 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
     
 5. Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
 
-6. Set the following environment variables using the information from the service principle that you created.
+6. To authenticate the Service Principal against Azure Stack environment, the endpoints should be defined using ```get_active_directory_settings()```. Retrieve 'authenication_endpoint' and 'token_audience' from ARM metadata endpoint.
+
+    Metadata endpoint format:
+    ```
+    <ResourceManagerUrl>/metadata/endpoints?api-version=1.0
+    ```
+    Example:
+    ```
+    https://management.<location>.azurestack.external/metadata/endpoints?api-version=1.0
+    ```
+
+    ```ruby
+    def get_active_directory_settings()
+        settings = MsRestAzure::ActiveDirectoryServiceSettings.new
+        settings.authentication_endpoint = '<authentication endpoint>'
+        settings.token_audience = '<token-audience>'
+    settings
+    end
+    ```
+
+7. Set the following environment variables using the information from the service principle that you created.
 
     ```
     export AZURE_TENANT_ID={your tenant id}
@@ -51,7 +71,7 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
 
     > [AZURE.NOTE] On Windows, use `set` instead of `export`.
 
-7. Run the sample.
+8. Run the sample.
 
     ```
     bundle exec ruby example.rb
@@ -79,7 +99,7 @@ This sample starts by setting up ResourceManagementClient, the resource provider
       credentials: credentials,
       subscription_id: subscription_id,
       active_directory_settings: active_directory_settings,
-      base_url: 'https://management.local.azurestack.external' # Azure Resource Manager Url
+      base_url: 'https://management.local.azurestack.external' # Your Azure Resource Manager Url
   }
 
   resource_client = Azure::Resources::Profiles::V2017_03_09::Mgmt::Client.new(options)
