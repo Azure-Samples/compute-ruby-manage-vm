@@ -40,36 +40,39 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
     
 5. Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
 
-6. To authenticate the Service Principal against Azure Stack environment, the endpoints should be defined using ```get_active_directory_settings()```. Retrieve 'authenication_endpoint' and 'token_audience' from ARM metadata endpoint.
-
-    Metadata endpoint format:
-    ```
-    <ResourceManagerUrl>/metadata/endpoints?api-version=1.0
-    ```
-    Example:
-    ```
-    https://management.<location>.azurestack.external/metadata/endpoints?api-version=1.0
-    ```
-
-    ```ruby
-    def get_active_directory_settings()
-        settings = MsRestAzure::ActiveDirectoryServiceSettings.new
-        settings.authentication_endpoint = '<authentication endpoint>'
-        settings.token_audience = '<token-audience>'
-    settings
-    end
-    ```
-
-7. Set the following environment variables using the information from the service principle that you created.
+6. Set the following environment variables using the information from the service principle that you created.
 
     ```
     export AZURE_TENANT_ID={your tenant id}
     export AZURE_CLIENT_ID={your client id}
     export AZURE_CLIENT_SECRET={your client secret}
     export AZURE_SUBSCRIPTION_ID={your subscription id}
+    export ARM_ENDPOINT={your AzureStack Resource manager url}`
     ```
 
     > [AZURE.NOTE] On Windows, use `set` instead of `export`.
+
+7. To authenticate the Service Principal against Azure Stack environment, the endpoints should be defined using ```get_active_directory_settings()```. This method uses the ARM_Endpoint environment variable that was set using the previous step.
+
+
+    ```ruby
+    # Get Authentication endpoints using Arm Metadata Endpoints
+    def get_active_directory_settings(armEndpoint)
+        settings = MsRestAzure::ActiveDirectoryServiceSettings.new
+        response = Net::HTTP.get_response(URI("#{armEndpoint}/metadata/endpoints?api-version=1.0"))
+        status_code = response.code
+        response_content = response.body
+        unless status_code == "200"
+            error_model = JSON.load(response_content)
+            fail MsRestAzure::AzureOperationError.new("Getting Azure Stack Metadata Endpoints", response, error_model)
+        end
+
+        result = JSON.load(response_content)
+        settings.authentication_endpoint = result['authentication']['loginEndpoint'] unless result['authentication']['loginEndpoint'].nil?
+        settings.token_audience = result['authentication']['audiences'][0] unless result['authentication']['audiences'][0].nil?
+        settings
+    end
+    ```
 
 8. Run the sample.
 
@@ -84,7 +87,9 @@ This sample starts by setting up ResourceManagementClient, the resource provider
 
 ```ruby
   subscription_id = ENV['AZURE_SUBSCRIPTION_ID'] || '11111111-1111-1111-1111-111111111111' # your Azure Subscription Id
-  active_directory_settings = get_active_directory_settings()
+
+  # This parameter is only required for AzureStack or other soverign clouds. Pulic Azure already has these settings by default.
+    active_directory_settings = get_active_directory_settings(ENV['ARM_ENDPOINT'])
 
 
   provider = MsRestAzure::ApplicationTokenProvider.new(
@@ -99,7 +104,7 @@ This sample starts by setting up ResourceManagementClient, the resource provider
       credentials: credentials,
       subscription_id: subscription_id,
       active_directory_settings: active_directory_settings,
-      base_url: 'https://management.local.azurestack.external' # Your Azure Resource Manager Url
+      base_url: ENV['ARM_ENDPOINT']
   }
 
   resource_client = Azure::Resources::Profiles::V2017_03_09::Mgmt::Client.new(options)
