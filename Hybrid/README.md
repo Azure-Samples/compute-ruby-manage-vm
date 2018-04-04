@@ -74,7 +74,9 @@ This sample demonstrates how to manage your Azure virtual machines using the Rub
     end
     ```
 
-8. Run the sample.
+8. Note that in order to run this sample, Ubuntu 16.04.0-LTS image must be present in AzureStack market place. This can be either [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) or [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
+
+9. Run the sample.
 
     ```
     bundle exec ruby example.rb
@@ -117,6 +119,8 @@ resource_group_params = Azure::ARM::Resources::Models::ResourceGroup.new.tap do 
 end
 
 resource_group = resource_client.resource_groups.create_or_update(RESOURCE_GROUP_NAME, resource_group_params)
+
+# Create a Storage Account. Encryption settings are only supported on blobs for AzureStack.
 postfix = rand(1000)
 storage_account_name = "rubystor#{postfix}"
 puts "Creating a standard storage account named #{storage_account_name} in resource group #{GROUP_NAME}"
@@ -194,7 +198,7 @@ vm_create_params = ComputeModels::VirtualMachine.new.tap do |vm|
     vm.os_profile = ComputeModels::OSProfile.new.tap do |os_profile|
         os_profile.computer_name = vm_name
         os_profile.admin_username = 'notAdmin'
-        os_profile.admin_password = 'Pa$$w0rd92'
+        os_profile.admin_password = SecureRandom.uuid
     end
     vm.storage_profile = ComputeModels::StorageProfile.new.tap do |store_profile|
         store_profile.image_reference = ComputeModels::ImageReference.new.tap do |ref|

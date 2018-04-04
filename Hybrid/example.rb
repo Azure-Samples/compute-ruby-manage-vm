@@ -68,6 +68,7 @@ def run_example
   puts 'Create Resource Group'
   print_group resource_client.resource_groups.create_or_update(GROUP_NAME, resource_group_params)
 
+  # Create a Storage Account. Encryption settings are only supported on blobs for AzureStack.
   postfix = rand(1000)
   storage_account_name = "rubystor#{postfix}"
   puts "Creating a standard storage account named #{storage_account_name} in resource group #{GROUP_NAME}"
@@ -119,7 +120,7 @@ def run_example
 
   export_template(resource_client)
 
-  puts "Connect to your new virtual machine via: 'ssh -p 22 #{vm.os_profile.admin_username}@#{public_ip.dns_settings.fqdn}'. Admin Password is: Pa$$w0rd92"
+  puts "Connect to your new virtual machine via: 'ssh -p 22 #{vm.os_profile.admin_username}@#{public_ip.dns_settings.fqdn}'. Admin Password is: #{vm.os_profile.admin_password}"
 
   puts 'Now that we have built a virtual machine, lets turn off the virtual machine.'
   puts 'Press any key to continue'
@@ -204,7 +205,7 @@ def create_vm(compute_client, network_client, location, vm_name, storage_acct, s
     vm.os_profile = ComputeModels::OSProfile.new.tap do |os_profile|
       os_profile.computer_name = vm_name
       os_profile.admin_username = 'notAdmin'
-      os_profile.admin_password = 'Pa$$w0rd92'
+      os_profile.admin_password = SecureRandom.uuid 
     end
 
     vm.storage_profile = ComputeModels::StorageProfile.new.tap do |store_profile|
