@@ -1,3 +1,14 @@
+---
+page_type: sample
+languages:
+- ruby
+products:
+- azure
+description: "This sample demonstrates how to manage your Azure virtual machines using the Ruby SDK."
+urlFragment: compute-ruby-manage-vm
+---
+
+
 # Manage virtual machines using Ruby
 This sample demonstrates how to manage your Azure virtual machines using the Ruby SDK.
 
